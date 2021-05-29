@@ -1,86 +1,85 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
 
+
 public class Client : MonoBehaviour
 {
-    [SerializeField] private ObjectManager _objectManager;
-
     public static Action<byte[]> OnDataHandle;
     
-    private UDP udp = new UDP();
+    private Udp udp = new Udp();
 
-    private int _frame = 0;
+    private int _frame = 0x00;
     private byte _ack = 0x00;
     private byte _input = 0x00;
     
-    private WaitForSecondsRealtime _frameRate = new WaitForSecondsRealtime(0.1f);
-    private Coroutine _gameplayCoroutine = null;
-
     public static bool GameRolling { get; private set; } = false;
     private float _timer = 0;
     [SerializeField] private float _timeBetweenMessagesSent = 0.5f;
 
     private bool _validDataRecived = true;
 
+    private bool _lostGame = false;
+
     private void OnEnable()
     {
         udp.OnRecivedData += ListenDataRecived;
         
         udp.Connect(5005);
-        
-        // SendFrame(_frame, _ack);
     }
-
-    private IEnumerator StartGameplay()
-    {
-        yield return new WaitForSeconds(0.1f);
-        
-        SendFrame(_frame, _ack);
-
-        yield return null;
-    }
-
-    private void Update()
-    {
-        _timer -= Time.deltaTime;
-
-        if (GameRolling && _timer <= 0 && _validDataRecived)
-        {
-            _timer = _timeBetweenMessagesSent;
-            SendFrame(_frame, _ack);
-        }
-        
-        if (Input.GetButtonDown("Go"))
-        {
-            GameRolling = true;
-        }
-    }
-
+    
     private void OnDisable()
     {
         udp.OnRecivedData -= ListenDataRecived;
     }
 
-    private void SendFrame(int frame, byte ack)
+    private void Update()
     {
-        print("frame " + frame);
+        //Debug.LogWarning($"Input : {_input} {(byte)(_input >> 1)} {(byte)(_input << 7)} {(byte)((_frame << 1) | (_input >> 1))} {(byte)((_input << 7) | (_ack))}");
+
+        _timer -= Time.deltaTime;
+
+        if (GameRolling && _timer <= 0 && _validDataRecived)
+        {
+            _timer = _timeBetweenMessagesSent;
+            _input = InputManager.GetCurrentInput();
+            SendFrame(_frame, _ack, _input);
+        }
         
+        if (Input.GetButtonDown("Submit"))
+        {
+            GameRolling = true;
+            
+            //SendFrame(_frame, _ack);
+        }
+    }
+
+    private void SendFrame(int frame, byte ack, byte input)
+    {
+//        print("frame " + frame);
+
         _validDataRecived = false;
 
-        byte[] packet = new byte[] {(byte)(frame << 1), ack};
-        
+        //byte[] packet = new byte[] {(byte)((frame << 1)), (byte)(ack)};
+        byte[] packet = {(byte)((_frame << 1) | (_input >> 1)), (byte)((_input << 7) | (_ack))};
+
         udp.SendData(packet);
     }
 
     private void ListenDataRecived(byte[] data)
     {
-        byte keyword = (byte)(data[0] ^ (_frame << 1) );
+        if (data.Length < 3)
+        {
+            Debug.LogError("Insuficient Data!");
+            ResendFrame();
+            return;
+        }
+        
+        byte keyword = (byte)(data[0] ^ ((_frame << 1) | (_input >> 1)));
 
-        Debug.Log("Keyword : " + keyword);
+//        Debug.Log("Keyword : " + keyword);
         
         byte[] decryptedData = new byte[data.Length];
 
@@ -96,67 +95,58 @@ public class Client : MonoBehaviour
         }
         Debug.Log(aux);
 
+        if ((data.Length / 3) - 1 != decryptedData[2])
+        {
+            Debug.LogError($"number of objects do not match {(data.Length / 3) - 1 } {decryptedData[2]}");
+            ResendFrame();
+            return;
+        }
+
         HandleData(decryptedData);
         
         _frame++;
-        _ack = decryptedData[1];
+        _ack = (byte)(decryptedData[1] ^ (_input << 7));
         _validDataRecived = true;
-        // SendFrame(_frame, _ack);
+    }
+
+    private void ResendFrame()
+    {
+        Debug.LogError("Bad Frame!");
+        Debug.LogError($"Resending frame {_frame} {_input} {_ack}");
+        
+        SendFrame(_frame, _ack, _input);
     }
 
     private void HandleData(byte[] data)
     {
-        bool _hasPlayer = false;
+        bool hasPlayer = false;
         for (int i = 0; i < data[2]; i++)
         {
             if (data[((i * 3) + 3)] == 0)
             {
-                _hasPlayer = true;
+                hasPlayer = true;
             }
         }
 
-        if (!_hasPlayer)
+        if (!hasPlayer)
         {
             GameRolling = false;
 
-            Debug.LogError("You Lost");
+            Debug.Log("You Lost");
         }
 
         OnDataHandle?.Invoke(data);
-
-        //Debug.LogWarning("object count : " + data[2]);
-
-        for (int i = 0; i < data[2]; i++)
-        {
-            // SendDataToController(data[((i * 3) + 3) + 0], data[((i * 3) + 3) + 1], data[((i * 3) + 3)+ 2]);
-            // var aux = "";
-            // for (int j = 0; j < 3; j++)
-            // {
-            //     aux += data[((i + 3) * 3) + j] + "  ";
-            // }
-            //
-            // Debug.LogWarning(aux);
-            
-            //MoveObject(data[((i + 3) * 3) + 0], data[((i + 3) * 3) + 1], data[((i + 3) * 3)+ 2]);
-        }
-    }
-
-    private void SendDataToController(byte id, byte horizontal, byte vertical)
-    {
-        Debug.LogWarning(id + " : " + horizontal + " , " + vertical);
-        
-        _objectManager.MoveObject(id, horizontal, vertical);
     }
 }
 
-public class UDP
+public class Udp
 {
     public UdpClient socket;
     public IPEndPoint endPoint;
 
     public Action<byte[]> OnRecivedData;
     
-    public UDP()
+    public Udp()
     {
         endPoint = new IPEndPoint(IPAddress.Parse("18.219.219.134"), 1981);
     }
