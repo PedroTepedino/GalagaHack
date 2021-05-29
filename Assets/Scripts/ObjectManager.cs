@@ -103,8 +103,6 @@ public class ObjectManager : MonoBehaviour
 
     public void MoveObject(byte id, byte horizontal, byte vertical)
     {
-        // Debug.Log($"-> {id} : {horizontal} , {vertical}");
-
         if (!_objectInstances.ContainsKey(id))
         {
             _objectInstances.Add(id, new Queue<ObjectInstance>());
@@ -159,7 +157,6 @@ public class ObjectManager : MonoBehaviour
             _colorsDictionary.Add(id, new Color(Random.Range(0f,1f), Random.Range(0f,1f), Random.Range(0f,1f), 1f));
         }
         
-        //_objectInstances[id].Enqueue(obj);
         obj.Setup(id, _colorsDictionary[id]);
         
         _allObjects.Add(obj);

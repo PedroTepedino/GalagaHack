@@ -85,40 +85,5 @@ public class PlayerAI : MonoBehaviour
     private void OnDataHandle(byte[] data)
     {
         _data = data;
-        // CurrentInput = (byte)(CurrentInput ^ 0x03);
-
-        // var playerPosition = new Vector2(0, 0);
-        // for (int i = 0; i < data[2]; i++)
-        // {
-        //     if (data[((i * 3) + 3) + 0] == 0)
-        //     {
-        //         playerPosition = new Vector2(data[((i * 3) + 3) + 1], data[((i * 3) + 3) + 2]);
-        //     }
-        // }
-        //
-        // int ocupiedPositions = 0;
-        //
-        // for (int i = 0; i < data[2]; i++)
-        // {
-        //     if (data[((i * 3) + 3) + 0] != 0 && data[((i * 3) + 3) + 0] != 1)
-        //     {
-        //         var enemyPosition =  new Vector2(data[((i * 3) + 3) + 1], data[((i * 3) + 3) + 2]);
-        //
-        //         if (enemyPosition == playerPosition + Vector2.up)
-        //         {
-        //             ocupiedPositions |= 1 << 1;
-        //         }
-        //         else if (enemyPosition == playerPosition + Vector2.up + Vector2.right)
-        //         {
-        //             ocupiedPositions |= 1 << 0;
-        //         }
-        //         else if (enemyPosition == playerPosition + Vector2.up + Vector2.left)
-        //         {
-        //             ocupiedPositions |= 1 << 2;
-        //         }
-        //     }
-        // }
-        //
-        // Debug.Log($"Ocupied positions {ocupiedPositions} -> {CurrentInput}");
     }
 }

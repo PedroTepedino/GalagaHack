@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 public enum InputTypes
@@ -11,19 +10,8 @@ public enum InputTypes
 
 public class InputManager : MonoBehaviour
 {
-    [SerializeField] private Client _client;
     public static InputTypes CurrentInput { get; private set; } = InputTypes.None;
     
-    private void Awake()
-    {
-        _client = FindObjectOfType<Client>();
-    }
-
-    private void Update()
-    {
-        
-    }
-
     public static byte GetCurrentInput()
     {
         float horizontal = Input.GetAxisRaw("Horizontal");
@@ -46,10 +34,5 @@ public class InputManager : MonoBehaviour
         }
 
         return (byte) (int) CurrentInput;
-    }
-
-    public static void ResetInput()
-    {
-        CurrentInput = InputTypes.None;
     }
 }
