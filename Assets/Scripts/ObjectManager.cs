@@ -6,9 +6,7 @@ public class ObjectManager : MonoBehaviour
 {
     [SerializeField] private Color _playerColor = Color.blue;
     [SerializeField] private Color _shotColor = Color.cyan;
-
-    // [SerializeField] private ObjectInstance _object;
-
+    
     private Dictionary<byte, Queue<ObjectInstance>> _objectInstances;
     private Dictionary<byte, Color> _colorsDictionary;
     private List<ObjectInstance> _allObjects;
@@ -16,6 +14,7 @@ public class ObjectManager : MonoBehaviour
     private byte[] _data = null;
     [SerializeField] private Sprite _defaultSprite;
     [SerializeField] private Sprite _playerSprite;
+    private bool _canRun;
 
     private void Start()
     {
@@ -28,8 +27,19 @@ public class ObjectManager : MonoBehaviour
         
         _colorsDictionary.Add(0x00, _playerColor);
         _colorsDictionary.Add(0x01, _shotColor);
+        
+        Client.OnStart += OnStart;
+        Client.OnLost += OnLost;
+        Client.OnTimeOut += OnTimeOut;
     }
-
+    
+    private void OnDestroy()
+    {
+        Client.OnStart -= OnStart;
+        Client.OnLost -= OnLost;
+        Client.OnTimeOut -= OnTimeOut;
+    }
+    
     private void OnEnable()
     {
         Client.OnDataHandle += ReciveDataHandle;
@@ -42,11 +52,26 @@ public class ObjectManager : MonoBehaviour
 
     private void Update()
     {
-        if (!Client.GameRolling) return;
+        if (!_canRun) return;
         
         if (_data == null) return;
         
         HandleData();
+    }
+    
+    private void OnStart()
+    {
+        _canRun = true;
+    }
+
+    private void OnLost(int frame)
+    {
+        _canRun = false;
+    }
+
+    private void OnTimeOut()
+    {
+        _canRun = false;
     }
 
     private void ReciveDataHandle(byte[] data)
@@ -72,6 +97,14 @@ public class ObjectManager : MonoBehaviour
         {
             if(((i * 3) + 3) + 2 < _data.Length)
                 MoveObject(_data[((i * 3) + 3) + 0], _data[((i * 3) + 3) + 1], _data[((i * 3) + 3)+ 2]);
+        }
+
+        foreach (var objectInstance in _allObjects)
+        {
+            if (!objectInstance.ChangedThisFrame)
+            {
+                objectInstance.Move(new Vector2(-10, -10));
+            }
         }
     }
 

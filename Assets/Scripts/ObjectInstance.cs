@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class ObjectInstance : MonoBehaviour
@@ -7,6 +8,7 @@ public class ObjectInstance : MonoBehaviour
     private Color _color;
     private SpriteRenderer _renderer;
     private bool _changedThisFrame = false;
+
     public bool ChangedThisFrame => _changedThisFrame;
 
     private void Start()
