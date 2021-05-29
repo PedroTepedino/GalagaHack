@@ -31,7 +31,15 @@ public class GameplayPanel : MonoBehaviour
     private void OnLost(int frame)
     {
         _lost = true;
-        _text.text = $"You Lost on frame : {frame}";
+
+        if (frame == 127)
+        {
+            _text.text = "YOU WON!";
+        }
+        else
+        {
+            _text.text = $"You Lost on frame : {frame}";
+        }
     }
     
     private void OnTimeOut()

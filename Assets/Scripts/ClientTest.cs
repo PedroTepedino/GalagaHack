@@ -27,7 +27,7 @@ public class ClientTest : MonoBehaviour
     {
         udp.OnRecivedData += ListenDataRecived;
         
-        udp.Connect(5005);
+        udp.Connect();
     }
     
     private void OnDisable()

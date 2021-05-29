@@ -11,6 +11,7 @@ public class Client : MonoBehaviour
     public static Action<int> OnLost;
     public static Action OnStart;
     public static Action OnTimeOut;
+    public static Action<byte[]> OnFoundSecretMessage;
     
     private Udp udp = new Udp();
 
@@ -28,11 +29,13 @@ public class Client : MonoBehaviour
 
     private bool _lostGame = true;
 
+    private int _sendAtempts = 0;
+
     private void OnEnable()
     {
         udp.OnRecivedData += ListenDataRecived;
         
-        udp.Connect(5005);
+        udp.Connect();
     }
     
     private void OnDisable()
@@ -47,7 +50,13 @@ public class Client : MonoBehaviour
         Timer -= Time.deltaTime;
         _timeBetweenPacketSendAndRecived += Time.deltaTime;
 
-        if (_timeBetweenPacketSendAndRecived >= 2.0 && GameRolling)
+        if (_timeBetweenPacketSendAndRecived >= 0.5 && GameRolling)
+        {
+            _sendAtempts++;
+            SendFrame(_frame, _ack, _input);
+        }
+
+        if (_sendAtempts >= 5)
         {
             _lostGame = true;
             GameRolling = false;
@@ -57,25 +66,23 @@ public class Client : MonoBehaviour
         if (GameRolling && Timer <= 0 && _validDataRecived)
         {
             Timer = _timeBetweenMessagesSent;
-            _input = InputManager.GetCurrentInput();
+            // _input = InputManager.GetCurrentInput(); // Uncoment in case you want to controll the player
+            _input = PlayerAI.GetCurrentInput(); // Coment is you wish to controll the player
             SendFrame(_frame, _ack, _input);
+            _sendAtempts = 0;
         }
-
 
         if (Input.GetButtonDown("Submit") && _lostGame)
         {
             GameRolling = true;
             _lostGame = false;
+            _validDataRecived = true;
 
             _frame = 0x00;
             _ack = 0x00;
             _input = 0x00;
 
             OnStart?.Invoke();
-            
-            Timer = _timeBetweenMessagesSent;
-            // _input = InputManager.GetCurrentInput();
-            SendFrame(_frame, _ack, _input);
         }
     }
 
@@ -97,21 +104,19 @@ public class Client : MonoBehaviour
         
         if (data.Length < 3)
         {
-            //Debug.LogError("Insuficient Data!");
             ResendFrame();
             return;
         }
         
         byte keyword = (byte)(data[0] ^ ((_frame << 1) | (_input >> 1)));
-
-//        Debug.Log("Keyword : " + keyword);
-        
+        Debug.Log($"Keyword : {keyword}");
         byte[] decryptedData = new byte[data.Length];
 
         for (int i = 0; i < data.Length; i++)
         {
             decryptedData[i] = (byte) (data[i] ^ keyword);
         }
+        
 
         var aux = "";
         foreach (var b in decryptedData)
@@ -122,13 +127,19 @@ public class Client : MonoBehaviour
 
         if ((data.Length / 3) - 1 != decryptedData[2])
         {
-            //Debug.LogError($"number of objects do not match {(data.Length / 3) - 1 } {decryptedData[2]}");
             ResendFrame();
             return;
         }
-
-        HandleData(decryptedData);
         
+        if (_frame == 127)
+        {
+            OnFoundSecretMessage?.Invoke(decryptedData);
+            udp.Disconnect(); 
+            this.gameObject.SetActive(false);
+        }
+        
+        HandleData(decryptedData);
+
         _frame++;
         _ack = (byte)(decryptedData[1] ^ (_input << 7));
         _validDataRecived = true;
@@ -136,9 +147,6 @@ public class Client : MonoBehaviour
 
     private void ResendFrame()
     {
-        // Debug.LogError("Bad Frame!");
-        // Debug.LogError($"Resending frame {_frame} {_input} {_ack}");
-        
         Timer = _timeBetweenMessagesSent;
         SendFrame(_frame, _ack, _input);
     }
@@ -163,7 +171,7 @@ public class Client : MonoBehaviour
             
             OnLost?.Invoke(_frame);
         }
-
+        
         OnDataHandle?.Invoke(data);
     }
 }
@@ -179,32 +187,20 @@ public class Udp
     {
         endPoint = new IPEndPoint(IPAddress.Parse("18.219.219.134"), 1981);
     }
-    
-    public static byte[] BitArrayToByteArray(BitArray bits)
-    {
-        byte[] ret = new byte[(bits.Length - 1) / 8 + 1];
-        bits.CopyTo(ret, 0);
-        return ret;
-    }
 
-    public void Connect(int _localPort)
+    public void Connect()
     {
         socket = new UdpClient();
 
         socket.Connect(endPoint);
         socket.BeginReceive(RecieveCallBack, null);
-
-        // BitArray bit = new BitArray(new bool[]
-        // {
-        //     false, false, false, false, false, false, false, 
-        //     false, false,
-        //     false, false, false, false, false, false, false
-        // });
-        //
-        // byte[] packet = BitArrayToByteArray(bit);
-        
-        // byte[] packet = BitConverter.GetBytes((short)(00));
     }
+
+    public void Disconnect()
+    {
+        socket.Close();
+    }
+    
 
     public void SendData(byte[] _packet)
     {
@@ -246,52 +242,5 @@ public class Udp
     private void HandleData(byte[] data)
     {
         OnRecivedData?.Invoke(data);
-        
-        // var keyword = data[0];
-        //
-        // var aux = " ";
-        // foreach (var b in data)
-        // {
-        //     aux += b + "  ";
-        // }
-        //
-        // Debug.Log(aux);
-        //
-        // byte[] decripted = data;
-        //
-        // for (int i = 0; i < data.Length; i++)
-        // {
-        //     decripted[i] = (byte)(data[i] ^ keyword);
-        // }
-        //
-        // aux = " ";
-        // foreach (var b in decripted)
-        // {
-        //     aux += b + "  ";
-        // }
-        //
-        // Debug.Log(aux);
-        //
-        // byte[] packet = new byte[] {0x00, 0x00};
-        // packet[0] += 2;
-        // packet[1] = decripted[1];
-    }
-
-    private void PrintBits(BitArray bitArray)
-    {
-        var aux = "";
-
-        for (int i = 0, j = 1; i < bitArray.Length; i++, j++)
-        {
-            aux = (bitArray[i] ? '1' : '0') + aux;
-
-            if (j == 4)
-            {
-                j = 0;
-                aux = "  " + aux;
-            }
-        }
-
-        Debug.Log(aux);
     }
 }

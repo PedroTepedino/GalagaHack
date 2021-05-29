@@ -77,13 +77,6 @@ public class ObjectManager : MonoBehaviour
     private void ReciveDataHandle(byte[] data)
     {
         _data = data;
-
-        // HandleData();
-        
-        // for (int i = 0; i < data[2]; i++)
-        // {
-        //     MoveObject(data[((i * 3) + 3) + 0], data[((i * 3) + 3) + 1], data[((i * 3) + 3)+ 2]);
-        // }
     }
 
     private void HandleData()
